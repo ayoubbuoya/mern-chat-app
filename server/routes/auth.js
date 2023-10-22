@@ -1,15 +1,61 @@
+require("dotenv").config();
 const express = require("express");
-const crypto = require("crypto");
+const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
 const router = express.Router();
 const db = require("../database/db");
 const User = require("../models/user");
 
-const JWT_SECRET = process.env.JWT_SECRET;
+/* router.post("/token", (req, res) => {
+  const refreshToken = req.body.token;
+  if (refreshToken == null) return res.sendStatus(401);
+  // if (!refreshTokens.includes(refreshToken)) return res.sendStatus(403);
 
-router.get("/", (req, res) => {
-  res.send("Hello In The Auth api");
+  jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+    const accessToken = generateAccesToken({ id: user.id, email: user.email });
+    res.json({ accessToken });
+  });
+}); */
+
+router.post("/register", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // connect to db
+    await db();
+
+    const existingUser = await User.findOne({ email });
+
+    if (existingUser) {
+      res.status(400).json({
+        status: "fail",
+        message: "User already exists",
+      });
+    } else {
+      hashedPassword = await bcrypt.hash(password, process.env.SALT);
+      // create a new user
+      const newUser = new User({
+        email,
+        password: hashedPassword,
+        accessToken: "",
+      });
+
+      await newUser.save();
+
+      res.status(201).json({
+        status: "success",
+        message: "User created successfully",
+      });
+    }
+  } catch (error) {
+    console.error("Registration error:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Internal server error",
+    });
+  }
 });
 
 router.post("/login", async (req, res) => {
@@ -20,42 +66,85 @@ router.post("/login", async (req, res) => {
   const user = await User.findOne({ email });
 
   if (!user) {
-    res.status(400).json({
+    return res.status(400).json({
       status: "fail",
       message: "User not found",
     });
   }
 
-  console.log(user);
-
-  /* const [salt, hash] = user.password.split("$");
-  const hashedPassword = crypto
-    .pbkdf2Sync(password, salt, 10000, 64, "sha512")
-    .toString("hex");
-
-  if (hash !== hashedPassword) {
-    res.status(400).json({
-      status: "fail",
-      message: "Incorrect password",
-    });
-  } */
-
+  console.log("User Found : ", user);
   // check if the password is correct
-  if (user.password !== password) {
-    res.status(400).json({
+  const isPasswordCorrect = await bcrypt.compare(password, user.password);
+  console.log("Password Correct : ", isPasswordCorrect);
+  console.log("Password : ", password);
+  console.log("User Password : ", user.password);
+
+  if (!isPasswordCorrect) {
+    return res.status(400).json({
       status: "fail",
       message: "Incorrect password",
     });
   }
 
   // Generate a JWT token
-  const accessToken = jwt.sign({ id: user._id, email: user.email }, JWT_SECRET);
-  console.log(accessToken);
+  const jwtUser = {
+    id: user._id,
+    email: user.email,
+  };
+  const accessToken = jwt.sign(jwtUser, process.env.JWT_SECRET, {
+    expiresIn: "7d",
+  });
+  user.accessToken = accessToken;
 
-  res.status(200).json({
+  await user.save();
+
+  res.cookie("accessToken", accessToken, {
+    maxAge: 1000 * 60 * 60 * 24 * 1, // 7 days
+    httpOnly: true,
+    secure: true,
+  });
+
+  return res.status(200).json({
     status: "success",
     message: "User logged in successfully",
+    user,
     accessToken,
+  });
+});
+
+router.post("/logout", (req, res) => {
+  const accessToken = req.body.token;
+
+  // delte refreshTokens from db
+  jwt.verify(accessToken, process.env.JWT_SECRET, async (err, decoded) => {
+    if (err) {
+      return res.status(401).json({
+        status: "fail",
+        message: "Invalid access token",
+      });
+    }
+
+    console.log("Decoded : ", decoded);
+
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return res.status(404).json({
+        status: "fail",
+        message: "User not found",
+      });
+    }
+
+    user.accessToken = "";
+
+    await user.save();
+
+    res.clearCookie("accessToken");
+
+    return res.status(204).json({
+      status: "success",
+      message: "User logged out successfully",
+    });
   });
 });
 

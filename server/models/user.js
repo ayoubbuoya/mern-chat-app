@@ -1,5 +1,6 @@
+require("dotenv").config();
 const mongoose = require("mongoose");
-const crypto = require("crypto");
+const bcrypt = require("bcrypt");
 
 const userSchema = new mongoose.Schema({
   email: {
@@ -12,17 +13,18 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  accessToken: {
+    type: String,
+  },
 });
 
 // Hashing password before saving it to the database
-userSchema.pre("save", function (next) {
+/* userSchema.pre("save", async function (next) {
   const user = this;
-  const salt = crypto.randomBytes(32).toString("hex");
-  const hash = crypto
-    .pbkdf2Sync(user.password, salt, 10000, 64, "sha512")
-    .toString("hex");
-  user.password = [salt, hash].join("$");
+  const salt = process.env.SALT;
+  const hashedPassword = await bcrypt.hash(user.password, salt);
+  user.password = hashedPassword;
   next();
-});
+}); */
 
 module.exports = mongoose.model("User", userSchema, "users");
