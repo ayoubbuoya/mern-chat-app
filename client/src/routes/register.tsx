@@ -10,7 +10,7 @@ import Cookies from "js-cookie";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-const Login: React.FC = () => {
+const Register: React.FC = () => {
   const API_URL: string = "http://localhost:7000/api/v1";
   const navigate = useNavigate();
   const currentUser = useAppSelector((state) => state.currentUser.value);
@@ -20,9 +20,11 @@ const Login: React.FC = () => {
   console.log("Is Signed In : ", isSignedIn);
   console.log(currentUser);
 
+  const [name, setName] = React.useState<string>("");
   const [email, setEmail] = React.useState<string>("");
   const [password, setPassword] = React.useState<string>("");
   const [recaptcha, setRecaptcha] = React.useState<string | null>("");
+
   async function getUser() {
     console.log("Getting user...");
     const accessToken = Cookies.get("accessToken");
@@ -59,8 +61,10 @@ const Login: React.FC = () => {
     checkIsSignedIn();
   }, []);
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    console.log("Registering...");
 
     if (!recaptcha) {
       toast.error("Please verify that you are not a robot!", {
@@ -76,14 +80,16 @@ const Login: React.FC = () => {
 
     try {
       const response = await toast.promise(
-        axios.post(API_URL + "/auth/login", {
+        axios.post(API_URL + "/auth/register", {
           email,
           password,
+          name,
+          username: email.split("@")[0],
         }),
         {
-          pending: "Logging in...",
-          success: "Logged in successfully!",
-          error: "Error logging in!",
+          pending: "Registering...",
+          success: "Registred successfully!",
+          error: "Error creating your account!",
         },
         {
           theme: "dark",
@@ -93,17 +99,11 @@ const Login: React.FC = () => {
           autoClose: 2000,
         }
       );
-      dispatch(setIsSignedIn(true));
+
       console.log(response.data);
-      dispatch(setCurrentUser(response.data.user));
-      // set accessToken cookie that will expire in 1 day
-      // document.cookie = `accessToken=${response.data.accessToken};max-age=86400000;path=/;HttpOnly:true;`;
-      Cookies.set("accessToken", response.data.accessToken, { expires: 1 });
-      // show cookie
-      console.log(document.cookie);
       // redirect to home page after the toast closes
       setTimeout(() => {
-        toast.loading("Redirecting to home page...", {
+        toast.loading("Redirecting to Login Page...", {
           theme: "colored",
           hideProgressBar: false,
           closeOnClick: true,
@@ -112,7 +112,7 @@ const Login: React.FC = () => {
           autoClose: 1000,
         });
         setTimeout(() => {
-          navigate("/");
+          navigate("/login");
         }, 1000);
       }, 2000);
     } catch (error) {
@@ -134,9 +134,28 @@ const Login: React.FC = () => {
         <div className="w-full bg-white rounded-lg shadow dark:border md:mt-0 sm:max-w-md xl:p-0 dark:bg-gray-800 dark:border-gray-700">
           <div className="p-6 space-y-4 md:space-y-6 sm:p-8">
             <h1 className="text-xl font-bold leading-tight tracking-tight text-gray-900 md:text-2xl dark:text-white">
-              Sign in to your account
+              Create and account
             </h1>
-            <form className="space-y-4 md:space-y-6" onSubmit={handleLogin}>
+            <form className="space-y-4 md:space-y-6" onSubmit={handleRegister}>
+              <div>
+                <label
+                  htmlFor="name"
+                  className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+                >
+                  Your name
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  id="name"
+                  placeholder="Your Name"
+                  className="bg-gray-50 border border-gray-300 text-gray-900 sm:text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </div>
+
               <div>
                 <label
                   htmlFor="email"
@@ -149,7 +168,7 @@ const Login: React.FC = () => {
                   name="email"
                   id="email"
                   className="bg-gray-50 border border-gray-300 text-gray-900 sm:text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                  placeholder="name@gmail.com"
+                  placeholder="name@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -173,34 +192,31 @@ const Login: React.FC = () => {
                   required
                 />
               </div>
-              <div className="flex items-center justify-between">
-                {
-                  <div className="flex items-start">
-                    {/* <div className="flex items-center h-5">
-                    <input
-                      id="remember"
-                      aria-describedby="remember"
-                      type="checkbox"
-                      className="w-4 h-4 border border-gray-300 rounded bg-gray-50 focus:ring-3 focus:ring-primary-300 dark:bg-gray-700 dark:border-gray-600 dark:focus:ring-primary-600 dark:ring-offset-gray-800"
-                      required
-                    />
-                  </div>
-                  <div className="ml-3 text-sm">
-                    <label
-                      htmlFor="remember"
-                      className="text-gray-500 dark:text-gray-300"
+
+              <div className="flex items-start">
+                <div className="flex items-center h-5">
+                  <input
+                    id="terms"
+                    aria-describedby="terms"
+                    type="checkbox"
+                    className="w-4 h-4 border border-gray-300 rounded bg-gray-50 focus:ring-3 focus:ring-primary-300 dark:bg-gray-700 dark:border-gray-600 dark:focus:ring-primary-600 dark:ring-offset-gray-800"
+                    required
+                  />
+                </div>
+                <div className="ml-3 text-sm">
+                  <label
+                    htmlFor="terms"
+                    className="font-light text-gray-500 dark:text-gray-300"
+                  >
+                    I accept the{" "}
+                    <a
+                      className="font-medium text-primary-600 hover:underline dark:text-primary-500"
+                      href="#"
                     >
-                      Remember me
-                    </label>
-                  </div> */}
-                  </div>
-                }
-                <a
-                  href="#"
-                  className="text-sm font-medium text-primary-600 hover:underline dark:text-primary-500"
-                >
-                  Forgot password?
-                </a>
+                      Terms and Conditions
+                    </a>
+                  </label>
+                </div>
               </div>
               <div className="flex items-center ml-10">
                 <ReCAPTCHA
@@ -213,15 +229,15 @@ const Login: React.FC = () => {
                 type="submit"
                 className="w-full text-white bg-primary-600 hover:bg-primary-700 focus:ring-4 focus:outline-none focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800"
               >
-                Sign in
+                Create an account
               </button>
               <p className="text-sm font-light text-gray-500 dark:text-gray-400">
-                Don’t have an account yet ?
+                Already have an account?{" "}
                 <a
-                  href="/register"
+                  href="/login"
                   className="font-medium text-primary-600 hover:underline dark:text-primary-500"
                 >
-                  Sign up
+                  Login here
                 </a>
               </p>
             </form>
@@ -232,4 +248,4 @@ const Login: React.FC = () => {
   );
 };
 
-export default Login;
+export default Register;

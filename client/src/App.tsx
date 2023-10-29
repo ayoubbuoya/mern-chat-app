@@ -18,7 +18,7 @@ function App() {
   return (
     <div className="h-screen w-full flex antialiased text-gray-200 bg-gray-900 overflow-hidden">
       {/* <Navbar title="Buoya Chat" /> */}
-      <Messenger currentUser={currentUser} />
+      <Messenger />
     </div>
   );
 

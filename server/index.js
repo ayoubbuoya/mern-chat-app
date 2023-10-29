@@ -21,11 +21,7 @@ const PORT = process.env.PORT || 9888;
 // routes
 const authRoute = require("./routes/auth");
 
-app.use(
-  cors({
-    origin: "http://localhost:3000",
-  })
-);
+app.use(cors());
 
 // parse requests of content-type - application/json
 app.use(express.json());

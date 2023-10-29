@@ -1,15 +1,15 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 interface User {
-  id: number;
+  id: number | null;
   name: string;
   username: string;
   email: string;
   picture: string;
-  status: string;
-  lastSeen: string;
-  createdAt: string;
-  updatedAt: string;
+  // status: string;
+  // lastSeen: string;
+  // createdAt: string;
+  // updatedAt: string;
 }
 
 interface currentUserState {
@@ -18,15 +18,15 @@ interface currentUserState {
 
 const initialState: currentUserState = {
   value: {
-    id: 1,
-    name: "Ayoub Amer",
-    username: "ayoub",
-    email: "ayoubamer202@gmail.com",
-    picture: "person/1.jpeg",
-    status: "active",
-    lastSeen: "3 minutes ago",
-    createdAt: "2021-01-01T12:00:00.000Z",
-    updatedAt: "2021-01-01T12:00:00.000Z",
+    id: null,
+    name: "",
+    username: "",
+    email: "",
+    picture: "",
+    // status: "active",
+    // lastSeen: "3 minutes ago",
+    // createdAt: "2021-01-01T12:00:00.000Z",
+    // updatedAt: "2021-01-01T12:00:00.000Z",
   },
 };
 

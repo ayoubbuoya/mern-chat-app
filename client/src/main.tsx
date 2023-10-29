@@ -1,4 +1,3 @@
-import React from "react";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import store from "./redux/store.ts";
@@ -7,17 +6,20 @@ import Root from "./routes/root.tsx";
 import Login from "./routes/login.tsx";
 import ErrorRoot from "./routes/errorRoot.tsx";
 import "./index.css";
+import Register from "./routes/register.tsx";
 
 const router = createBrowserRouter([
   {
     path: "/",
     element: <Root />,
-    errorElement: <ErrorRoot />,
   },
   {
     path: "/login",
     element: <Login />,
-    errorElement: <ErrorRoot />,
+  },
+  {
+    path: "/register",
+    element: <Register />,
   },
 ]);
 

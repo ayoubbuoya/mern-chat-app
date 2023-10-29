@@ -1,18 +1,8 @@
 import React from "react";
 
-interface User {
-  id: number;
-  username: string;
-  picture: string;
-  status: string;
-  lastSeen: string;
-}
 
-interface ChatProps {
-  currentUser: User;
-}
 
-const Chat: React.FC<ChatProps> = ({ currentUser }) => {
+const Chat: React.FC = () => {
   /* Right Side */
   return (
     <section className="flex flex-col flex-auto border-l border-gray-800">

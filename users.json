@@ -1,0 +1,26 @@
+[
+  {
+    "email": "ayoubamerrr290@gmail.com",
+    "password": "ayoub123",
+    "name": "Ayoub Amer",
+    "username": "ayoub"
+  },
+  {
+    "email": "adem@gmail.com",
+    "password": "adem123",
+    "name": "Adem jerbi",
+    "username": "adem"
+  }, 
+  {
+    "email": "islem@gmail.com",
+    "password": "islem123",
+    "name": "Islem jerbi",
+    "username": "islem"
+  }, 
+  {
+    "email": "hamdi@gmail.com",
+    "password": "hamdi123",
+    "name": "Hamdi BouAzizi",
+    "username": "hamdi"
+  }
+]

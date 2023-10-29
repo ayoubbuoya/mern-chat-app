@@ -21,7 +21,7 @@ const User = require("../models/user");
 
 router.post("/register", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, name, username, picture } = req.body;
 
     // connect to db
     await db();
@@ -29,7 +29,7 @@ router.post("/register", async (req, res) => {
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
-      res.status(400).json({
+      return res.status(400).json({
         status: "fail",
         message: "User already exists",
       });
@@ -39,19 +39,22 @@ router.post("/register", async (req, res) => {
       const newUser = new User({
         email,
         password: hashedPassword,
+        name,
+        username,
+        picture,
         accessToken: "",
       });
 
       await newUser.save();
 
-      res.status(201).json({
+      return res.status(201).json({
         status: "success",
         message: "User created successfully",
       });
     }
   } catch (error) {
     console.error("Registration error:", error);
-    res.status(500).json({
+    return res.status(500).json({
       status: "error",
       message: "Internal server error",
     });
@@ -92,14 +95,15 @@ router.post("/login", async (req, res) => {
     email: user.email,
   };
   const accessToken = jwt.sign(jwtUser, process.env.JWT_SECRET, {
-    expiresIn: "7d",
+    expiresIn: "1d",
   });
+
   user.accessToken = accessToken;
 
   await user.save();
 
   res.cookie("accessToken", accessToken, {
-    maxAge: 1000 * 60 * 60 * 24 * 1, // 7 days
+    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
     httpOnly: true,
     secure: true,
   });
@@ -107,8 +111,14 @@ router.post("/login", async (req, res) => {
   return res.status(200).json({
     status: "success",
     message: "User logged in successfully",
-    user,
     accessToken,
+    user: {
+      id: user._id,
+      email: user.email,
+      name: user.name,
+      username: user.username,
+      picture: user.picture,
+    },
   });
 });
 
@@ -138,12 +148,56 @@ router.post("/logout", (req, res) => {
     user.accessToken = "";
 
     await user.save();
+  });
 
-    res.clearCookie("accessToken");
+  res.clearCookie("accessToken");
 
-    return res.status(204).json({
+  return res.status(204).json({
+    status: "success",
+    message: "User logged out successfully",
+  });
+});
+
+router.get("/me", async (req, res) => {
+  const accessToken = req.headers.authorization.split(" ")[1];
+  console.log("acces Token ", accessToken);
+
+  if (!accessToken) {
+    return res.status(401).json({
+      status: "fail",
+      message: "No Acces Token Provided in Reuest Header",
+    });
+  }
+
+  jwt.verify(accessToken, process.env.JWT_SECRET, async (err, decoded) => {
+    if (err) {
+      return res.status(401).json({
+        status: "fail",
+        message: "Invalid access token",
+      });
+    }
+
+    console.log("Decoded : ", decoded);
+
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return res.status(404).json({
+        status: "fail",
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
       status: "success",
-      message: "User logged out successfully",
+      message: "User found",
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        username: user.username,
+        picture: user.picture,
+      },
     });
   });
 });

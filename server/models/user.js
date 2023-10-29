@@ -13,8 +13,28 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  name: {
+    type: String,
+  },
+  username: {
+    type: String,
+    unique: true,
+    required: true,
+  },
+  picture: {
+    type: String,
+  },
   accessToken: {
     type: String,
+  },
+  contacts: [
+    {
+      type: Number || null,
+    },
+  ],
+  createdAt: {
+    type: Date,
+    default: Date.now,
   },
 });
 
