@@ -8,7 +8,7 @@ interface User {
   picture: string;
   // status: string;
   // lastSeen: string;
-  // createdAt: string;
+  createdAt: string;
   // updatedAt: string;
 }
 
@@ -25,7 +25,7 @@ const initialState: currentUserState = {
     picture: "",
     // status: "active",
     // lastSeen: "3 minutes ago",
-    // createdAt: "2021-01-01T12:00:00.000Z",
+    createdAt: "",
     // updatedAt: "2021-01-01T12:00:00.000Z",
   },
 };

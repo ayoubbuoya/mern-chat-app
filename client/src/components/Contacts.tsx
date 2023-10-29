@@ -2,15 +2,21 @@ import React from "react";
 import { useAppDispatch, useAppSelector } from "../redux/hooks";
 import { setCurrentUser } from "../redux/features/currentUser/currentUserSlice";
 import { setIsSignedIn } from "../redux/features/loginState/signedInSlice";
+import { setCurrentChat } from "../redux/features/currentChat/currentChatSlice";
 import Cookies from "js-cookie";
 
 const Contacts: React.FC = () => {
   const currentUser = useAppSelector((state) => state.currentUser.value);
+  const contacts = useAppSelector((state) => state.contacts.value);
+  const chats = useAppSelector((state) => state.chats.value);
   const dispatch = useAppDispatch();
 
-  console.log("Cuurent User", currentUser);
+  // const [contacts, setContacts] = useState<Array<Contact> | null>();
+
+  console.log("Current User", currentUser);
 
   const handleLogOut = () => {
+    console.log("Logging out...");
     dispatch(
       setCurrentUser({
         id: null,
@@ -18,6 +24,7 @@ const Contacts: React.FC = () => {
         username: "",
         email: "",
         picture: "",
+        createdAt: "",
       })
     );
     dispatch(setIsSignedIn(false));
@@ -81,30 +88,30 @@ const Contacts: React.FC = () => {
 
       {/* Start Active Users */}
       <div className="active-users flex flex-row p-2 overflow-auto w-0 min-w-full">
-        <div className="text-sm text-center mr-4">
-          <button
-            className="flex flex-shrink-0 focus:outline-none block bg-gray-800 text-gray-600 rounded-full w-20 h-20"
-            type="button"
-          >
-            <svg className="w-full h-full fill-current" viewBox="0 0 24 24">
-              <path d="M17 11a1 1 0 0 1 0 2h-4v4a1 1 0 0 1-2 0v-4H7a1 1 0 0 1 0-2h4V7a1 1 0 0 1 2 0v4h4z" />
-            </svg>
-          </button>
-          <p>Your Story</p>
-        </div>
-        <div className="text-sm text-center mr-4">
-          <div className="p-1 border-4 border-blue-600 rounded-full">
-            <div className="w-16 h-16 relative flex flex-shrink-0">
-              <img
-                className="shadow-md rounded-full w-full h-full object-cover"
-                src="https://randomuser.me/api/portraits/women/12.jpg"
-                alt=""
-              />
-            </div>
-          </div>
-          <p>Anna</p>
-        </div>
-        <div className="text-sm text-center mr-4">
+        
+        {contacts &&
+          contacts.length > 0 &&
+          contacts.map((contact, index) => {
+            return (
+              <div key={index} className="text-sm text-center mr-4">
+                <div className="p-1 border-4 border-transparent rounded-full">
+                  <div className="w-16 h-16 relative flex flex-shrink-0">
+                    <img
+                      className="shadow-md rounded-full w-full h-full object-cover"
+                      src={contact.picture}
+                      alt=""
+                    />
+                    <div className="absolute bg-gray-900 p-1 rounded-full bottom-0 right-0">
+                      <div className="bg-green-500 rounded-full w-3 h-3"></div>
+                    </div>
+                  </div>
+                </div>
+                <p>{contact.name}</p>
+              </div>
+            );
+          })}
+
+        {/* <div className="text-sm text-center mr-4">
           <div className="p-1 border-4 border-transparent rounded-full">
             <div className="w-16 h-16 relative flex flex-shrink-0">
               <img
@@ -118,52 +125,51 @@ const Contacts: React.FC = () => {
             </div>
           </div>
           <p>Jeff</p>
-        </div>
+        </div> */}
       </div>
       {/* End Active Users */}
 
       {/* Start Chats */}
       <div className="contacts p-2 flex-1 overflow-y-scroll">
-        <div className="flex justify-between items-center p-3 hover:bg-gray-800 rounded-lg relative">
-          <div className="w-16 h-16 relative flex flex-shrink-0">
-            <img
-              className="shadow-md rounded-full w-full h-full object-cover"
-              src="https://randomuser.me/api/portraits/women/61.jpg"
-              alt=""
-            />
-          </div>
-          <div className="flex-auto min-w-0 ml-4 mr-6 hidden md:block group-hover:block">
-            <p>Angelina Jolie</p>
-            <div className="flex items-center text-sm text-gray-600">
-              <div className="min-w-0">
-                <p className="truncate">Ok, see you at the subway in a bit.</p>
+        {chats &&
+          chats.length > 0 &&
+          chats.map((chat, index) => {
+            if (chat.messages.length === 0) {
+              return null;
+            }
+
+            return (
+              <div
+                key={index}
+                className="flex justify-between items-center p-3 hover:bg-gray-800 rounded-lg relative cursor-pointer"
+                onClick={() => {
+                  dispatch(setCurrentChat(chat));
+                }}
+              >
+                <div className="w-16 h-16 relative flex flex-shrink-0">
+                  <img
+                    className="shadow-md rounded-full w-full h-full object-cover"
+                    src={chat.contact.picture}
+                    alt=""
+                  />
+                </div>
+                <div className="flex-auto min-w-0 ml-4 mr-6 hidden md:block group-hover:block">
+                  <p>{chat.contact.name}</p>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <div className="min-w-0">
+                      <p className="truncate">
+                        {chat.messages[chat.messages.length - 1] &&
+                          chat.messages[chat.messages.length - 1].message}
+                      </p>
+                    </div>
+                    {/*  <p className="ml-2 whitespace-no-wrap">
+                      {"10 minutes ago"}
+                    </p> */}
+                  </div>
+                </div>
               </div>
-              <p className="ml-2 whitespace-no-wrap">Just now</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex justify-between items-center p-3 hover:bg-gray-800 rounded-lg relative">
-          <div className="w-16 h-16 relative flex flex-shrink-0">
-            <img
-              className="shadow-md rounded-full w-full h-full object-cover"
-              src="https://randomuser.me/api/portraits/men/97.jpg"
-              alt=""
-            />
-            <div className="absolute bg-gray-900 p-1 rounded-full bottom-0 right-0">
-              <div className="bg-green-500 rounded-full w-3 h-3"></div>
-            </div>
-          </div>
-          <div className="flex-auto min-w-0 ml-4 mr-6 hidden md:block group-hover:block">
-            <p className="font-bold">Tony Stark</p>
-            <div className="flex items-center text-sm font-bold">
-              <div className="min-w-0">
-                <p className="truncate">Hey, Are you there?</p>
-              </div>
-              <p className="ml-2 whitespace-no-wrap">10min</p>
-            </div>
-          </div>
-          <div className="bg-blue-700 w-3 h-3 rounded-full flex flex-shrink-0 hidden md:block group-hover:block"></div>
-        </div>
+            );
+          })}
       </div>
       {/* End Chats */}
     </section>

@@ -23,6 +23,7 @@ const Login: React.FC = () => {
   const [email, setEmail] = React.useState<string>("");
   const [password, setPassword] = React.useState<string>("");
   const [recaptcha, setRecaptcha] = React.useState<string | null>("");
+  
   async function getUser() {
     console.log("Getting user...");
     const accessToken = Cookies.get("accessToken");

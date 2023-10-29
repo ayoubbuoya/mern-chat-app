@@ -86,7 +86,7 @@ router.post("/login", async (req, res) => {
     return res.status(400).json({
       status: "fail",
       message: "Incorrect password",
-    });
+    }); 
   }
 
   // Generate a JWT token

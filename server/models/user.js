@@ -29,7 +29,12 @@ const userSchema = new mongoose.Schema({
   },
   contacts: [
     {
-      type: Number || null,
+      type: String || null,
+    },
+  ],
+  messages: [
+    {
+      type: String || null,
     },
   ],
   createdAt: {
@@ -37,14 +42,5 @@ const userSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
-
-// Hashing password before saving it to the database
-/* userSchema.pre("save", async function (next) {
-  const user = this;
-  const salt = process.env.SALT;
-  const hashedPassword = await bcrypt.hash(user.password, salt);
-  user.password = hashedPassword;
-  next();
-}); */
 
 module.exports = mongoose.model("User", userSchema, "users");
