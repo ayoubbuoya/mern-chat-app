@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 interface User {
-  id: number | null;
+  id: string;
   name: string;
   username: string;
   email: string;
@@ -18,7 +18,7 @@ interface currentUserState {
 
 const initialState: currentUserState = {
   value: {
-    id: null,
+    id: "",
     name: "",
     username: "",
     email: "",

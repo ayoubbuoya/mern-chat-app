@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const Server = require("socket.io");
 
 const app = express();
 
@@ -32,7 +33,7 @@ app.use(express.json());
 app.use("/api/v1/auth", authRoute);
 app.use("/api/v1/contacts", contactsRoute);
 app.use("/api/v1/chats", chatsRoute);
-
+app.use("/storage/images", express.static("./storgae/images"));
 
 app.get("/posts", authenticateToken, (req, res) => {
   res.json(posts.filter((post) => post.email === req.user.email));
@@ -65,6 +66,42 @@ function authenticateToken(req, res, next) {
 }
 
 // Start the server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log("Server started on port ", PORT);
+});
+
+const io = require("socket.io")(server, {
+  cors: {
+    origin: "*",
+  },
+});
+
+io.on("connection", (socket) => {
+  console.log("User connected");
+
+  socket.on("setup", (userData) => {
+    socket.join(userData._id);
+    console.log("User with ID : ", socket.id);
+    socket.emit("connected");
+  });
+
+  socket.on("join_chat", (room) => {
+    socket.join(room);
+    console.log("User with ID : ", socket.id, " joined room : ", room);
+  });
+
+  socket.on("send_message", (data) => {
+    console.log("Data send message : ", data);
+    socket.to(data.user.room).emit("new_message", data);
+    // socket.to().emit("message_received", data);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected");
+  });
+
+  socket.off("setup", () => {
+    console.log("USER DISCONNECTED");
+    socket.leave(userData._id);
+  });
 });

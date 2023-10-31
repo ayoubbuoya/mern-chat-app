@@ -2,20 +2,24 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 interface Message {
   id: string;
-  sender_username: string;
-  receiver_username: string;
+  sender_id: string;
+  receiver_id: string;
   message: string;
   createdAt: string;
 }
 
+interface Participant {
+  id: string;
+  name: string;
+  username: string;
+  picture: string;
+}
+
 interface Chat {
-  contact: {
-    id: string;
-    name: string;
-    username: string;
-    picture: string;
-  };
+  id: string;
+  participants: Participant[];
   messages: Message[];
+  createdAt: string;
 }
 
 interface ChatState {
@@ -23,7 +27,7 @@ interface ChatState {
 }
 
 const initialState: ChatState = {
-  value: null, 
+  value: null,
 };
 
 export const chatsSlice = createSlice({
@@ -36,7 +40,7 @@ export const chatsSlice = createSlice({
   },
 });
 
-const chatsReducer = chatsSlice.reducer; 
+const chatsReducer = chatsSlice.reducer;
 
 export const { setChats } = chatsSlice.actions;
 
