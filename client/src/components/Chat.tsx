@@ -1,18 +1,82 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useAppDispatch, useAppSelector } from "../redux/hooks";
 import axios from "axios";
 import Cookies from "js-cookie";
 import { setCurrentChat } from "../redux/features/currentChat/currentChatSlice";
+import { ToastContainer, toast } from "react-toastify";
+import { Socket, io } from "socket.io-client";
+import { DefaultEventsMap } from "@socket.io/component-emitter";
+import { setOtherParticipant } from "../redux/features/otherParticipant/otherParticipantSlice";
+
+let socket: Socket<DefaultEventsMap, DefaultEventsMap>;
 
 const Chat: React.FC = () => {
   const API_URL: string = "http://localhost:7000/api/v1";
+  const BACKEND: string = "http://localhost:7000/";
   const currentChat = useAppSelector((state) => state.currentChat.value);
   const currentUser = useAppSelector((state) => state.currentUser.value);
+  const otherParticipant = useAppSelector(
+    (state) => state.otherParticipant.value
+  );
+  // const chats = useAppSelector((state) => state.chats.value);
   const dispatch = useAppDispatch();
+  const chatBodyRef = useRef<HTMLDivElement>(null);
 
   const [msg, setMsg] = useState<string>("");
+  const [socketConnected, setSocketConnected] = useState<boolean>(false);
 
   console.log("Current Chat", currentChat);
+
+  useEffect(() => {
+    if (!socketConnected) {
+      socket = io("http://localhost:7000");
+      socket.emit("setup", currentUser);
+      socket.on("connected", () => {
+        console.log("Connected to socket.io");
+        setSocketConnected(true);
+      });
+    } else {
+      console.log("Socket already connected");
+    }
+  }, []);
+
+  useEffect(() => {
+    // Scroll to the bottom of the chat-body div
+    chatBodyRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (currentChat) {
+      // const room_id = "test_room";
+      console.log("Joining chat room : ", currentChat.id);
+      socket.emit("join_chat", currentChat.id);
+
+      socket.on("new_message", (data) => {
+        console.log("New Message Sended : ", data);
+        dispatch(
+          setCurrentChat({
+            id: currentChat.id,
+            participants: currentChat.participants,
+            messages: [
+              ...currentChat.messages,
+              {
+                id: data.chat.id,
+                sender_id: data.chat.sender_id,
+                receiver_id: data.chat.receiver_id,
+                message: data.chat.message,
+                createdAt: data.chat.createdAt,
+              },
+            ],
+            createdAt: currentChat.createdAt,
+          })
+        );
+        const otherParticip = currentChat.participants.find(
+          (participant) => participant.id !== currentUser.id
+        );
+        if (!otherParticip) {
+          return;
+        }
+        dispatch(setOtherParticipant(otherParticip));
+      });
+    }
+  }, [currentChat]);
 
   if (!currentChat) {
     return (
@@ -34,61 +98,95 @@ const Chat: React.FC = () => {
     console.log("Access Token : ", accessToken);
 
     const data = {
-      receiver_username: currentChat.contact.username,
+      receiver_username: otherParticipant.username,
       message: msg,
     };
-    console.log(data);
 
     // axios request to server to send message
-    try {
-      const response = await axios.post(
-        API_URL + "/chats/send",
-        {
-          receiver_username: currentChat.contact.username,
-          message: msg,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
-      console.log(response);
+    const msgId =
+      currentUser.username +
+      "_" +
+      otherParticipant.username +
+      "_" +
+      Date.now().toString();
 
+    try {
+      // add message to current chat localy
       dispatch(
         setCurrentChat({
-          contact: currentChat.contact,
+          id: currentChat.id,
+          participants: currentChat.participants,
           messages: [
             ...currentChat.messages,
             {
-              id: "id",
-              sender_username: currentUser.username,
-              receiver_username: currentChat.contact.username,
+              id: msgId,
+              sender_id: currentUser.id,
+              receiver_id: otherParticipant.id,
               message: msg,
               createdAt: new Date().toISOString(),
             },
           ],
+          createdAt: currentChat.createdAt,
         })
       );
+      // send message socket
+      socket.emit("send_message", {
+        user: {
+          id: socket.id,
+          room: currentChat.id,
+          username: currentUser.username,
+        },
+        chat: {
+          id: msgId,
+          sender_id: currentUser.id,
+          receiver_id: otherParticipant.id,
+          message: msg,
+          createdAt: new Date().toISOString(),
+        },
+      });
       setMsg("");
+      // Scroll to the bottom of the chat-body div
+      // chatBodyRef.current?.scrollIntoView({ behavior: "smooth" });
+
+      const response = await axios.post(API_URL + "/chats/send", data, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      console.log(response);
     } catch (error) {
       console.log(error);
+      toast.error("Failed to send message!");
+      // remove the added message from current chat
+      dispatch(
+        setCurrentChat({
+          id: currentChat.id,
+          participants: currentChat.participants,
+          messages: currentChat.messages.filter((message) => message.id !== msgId),
+          createdAt: currentChat.createdAt,
+        })
+      );
     }
   };
 
   return (
-    <section className="flex flex-col flex-auto border-l border-gray-800">
+    <section className="flex flex-col flex-auto border-l border-gray-800 overflow-y-scroll">
+      <ToastContainer />
       <div className="chat-header mb-7 px-6 py-4 flex flex-row flex-none justify-between items-center shadow">
         <div className="flex">
           <div className="w-12 h-12 mr-4 relative flex flex-shrink-0">
             <img
               className="shadow-md rounded-full w-full h-full object-cover"
-              src={currentChat?.contact.picture}
+              src={
+                otherParticipant.picture.startsWith("http")
+                  ? otherParticipant.picture
+                  : BACKEND + otherParticipant.picture
+              }
               alt=""
             />
           </div>
           <div className="text-sm">
-            <p className="font-bold space-x-2">{currentChat?.contact.name}</p>
+            <p className="font-bold space-x-2">{otherParticipant.name}</p>
             <p>Active 1h ago</p>
           </div>
         </div>
@@ -129,263 +227,36 @@ const Chat: React.FC = () => {
           </a>
         </div>
       </div>
-
-      {/* <div className="chat-body p-4 flex-1 overflow-y-scroll">
-        <div className="flex flex-row justify-start">
-
-          <div className="w-8 h-8 relative flex flex-shrink-0 mr-4">
-            <img
-              className="shadow-md rounded-full w-full h-full object-cover"
-              src={currentChat?.contact.picture}
-              alt=""
-            />
-          </div>
-          <div className="messages text-sm text-gray-700 grid grid-flow-row gap-2">
-            <div className="flex items-center group">
-              <p className="px-6 py-3 rounded-t-full rounded-r-full bg-gray-800 max-w-xs lg:max-w-md text-gray-200">
-                Hey! How are you?
-              </p>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 20 20" className="w-full h-full fill-current">
-                  <path
-                    d="M10.001,7.8C8.786,7.8,7.8,8.785,7.8,10s0.986,2.2,2.201,2.2S12.2,11.215,12.2,10S11.216,7.8,10.001,7.8z
-M3.001,7.8C1.786,7.8,0.8,8.785,0.8,10s0.986,2.2,2.201,2.2S5.2,11.214,5.2,10S4.216,7.8,3.001,7.8z M17.001,7.8
-C15.786,7.8,14.8,8.785,14.8,10s0.986,2.2,2.201,2.2S19.2,11.215,19.2,10S18.216,7.8,17.001,7.8z"
-                  />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 20 20" className="w-full h-full fill-current">
-                  <path d="M19,16.685c0,0-2.225-9.732-11-9.732V2.969L1,9.542l7,6.69v-4.357C12.763,11.874,16.516,12.296,19,16.685z" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 24 24" className="w-full h-full fill-current">
-                  <path d="M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20zm0-2a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm-3.54-4.46a1 1 0 0 1 1.42-1.42 3 3 0 0 0 4.24 0 1 1 0 0 1 1.42 1.42 5 5 0 0 1-7.08 0zM9 11a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm6 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2z" />
-                </svg>
-              </button>
-            </div>
-            <div className="flex items-center group">
-              <p className="px-6 py-3 rounded-r-full bg-gray-800 max-w-xs lg:max-w-md text-gray-200">
-                Shall we go for Hiking this weekend?
-              </p>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 20 20" className="w-full h-full fill-current">
-                  <path
-                    d="M10.001,7.8C8.786,7.8,7.8,8.785,7.8,10s0.986,2.2,2.201,2.2S12.2,11.215,12.2,10S11.216,7.8,10.001,7.8z
-M3.001,7.8C1.786,7.8,0.8,8.785,0.8,10s0.986,2.2,2.201,2.2S5.2,11.214,5.2,10S4.216,7.8,3.001,7.8z M17.001,7.8
-C15.786,7.8,14.8,8.785,14.8,10s0.986,2.2,2.201,2.2S19.2,11.215,19.2,10S18.216,7.8,17.001,7.8z"
-                  />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 20 20" className="w-full h-full fill-current">
-                  <path d="M19,16.685c0,0-2.225-9.732-11-9.732V2.969L1,9.542l7,6.69v-4.357C12.763,11.874,16.516,12.296,19,16.685z" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 24 24" className="w-full h-full fill-current">
-                  <path d="M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20zm0-2a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm-3.54-4.46a1 1 0 0 1 1.42-1.42 3 3 0 0 0 4.24 0 1 1 0 0 1 1.42 1.42 5 5 0 0 1-7.08 0zM9 11a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm6 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2z" />
-                </svg>
-              </button>
-            </div>
-            <div className="flex items-center group">
-              <p className="px-6 py-3 rounded-b-full rounded-r-full bg-gray-800 max-w-xs lg:max-w-md text-gray-200">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-                eiusmod tempor incididunt ut labore et dolore magna aliqua.
-                Volutpat lacus laoreet non curabitur gravida.
-              </p>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 20 20" className="w-full h-full fill-current">
-                  <path
-                    d="M10.001,7.8C8.786,7.8,7.8,8.785,7.8,10s0.986,2.2,2.201,2.2S12.2,11.215,12.2,10S11.216,7.8,10.001,7.8z
-M3.001,7.8C1.786,7.8,0.8,8.785,0.8,10s0.986,2.2,2.201,2.2S5.2,11.214,5.2,10S4.216,7.8,3.001,7.8z M17.001,7.8
-C15.786,7.8,14.8,8.785,14.8,10s0.986,2.2,2.201,2.2S19.2,11.215,19.2,10S18.216,7.8,17.001,7.8z"
-                  />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 20 20" className="w-full h-full fill-current">
-                  <path d="M19,16.685c0,0-2.225-9.732-11-9.732V2.969L1,9.542l7,6.69v-4.357C12.763,11.874,16.516,12.296,19,16.685z" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 24 24" className="w-full h-full fill-current">
-                  <path d="M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20zm0-2a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm-3.54-4.46a1 1 0 0 1 1.42-1.42 3 3 0 0 0 4.24 0 1 1 0 0 1 1.42 1.42 5 5 0 0 1-7.08 0zM9 11a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm6 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2z" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-        <p className="p-4 text-center text-sm text-gray-500">FRI 3:04 PM</p>
-        <div className="flex flex-row justify-end">
-          <div className="messages text-sm text-white grid grid-flow-row gap-2">
-            <div className="flex items-center flex-row-reverse group">
-              <p className="px-6 py-3 rounded-t-full rounded-l-full bg-blue-700 max-w-xs lg:max-w-md">
-                Hey! How are you?
-              </p>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 20 20" className="w-full h-full fill-current">
-                  <path
-                    d="M10.001,7.8C8.786,7.8,7.8,8.785,7.8,10s0.986,2.2,2.201,2.2S12.2,11.215,12.2,10S11.216,7.8,10.001,7.8z
-   M3.001,7.8C1.786,7.8,0.8,8.785,0.8,10s0.986,2.2,2.201,2.2S5.2,11.214,5.2,10S4.216,7.8,3.001,7.8z M17.001,7.8
-  C15.786,7.8,14.8,8.785,14.8,10s0.986,2.2,2.201,2.2S19.2,11.215,19.2,10S18.216,7.8,17.001,7.8z"
-                  />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 20 20" className="w-full h-full fill-current">
-                  <path d="M19,16.685c0,0-2.225-9.732-11-9.732V2.969L1,9.542l7,6.69v-4.357C12.763,11.874,16.516,12.296,19,16.685z" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 24 24" className="w-full h-full fill-current">
-                  <path d="M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20zm0-2a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm-3.54-4.46a1 1 0 0 1 1.42-1.42 3 3 0 0 0 4.24 0 1 1 0 0 1 1.42 1.42 5 5 0 0 1-7.08 0zM9 11a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm6 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2z" />
-                </svg>
-              </button>
-            </div>
-            <div className="flex items-center flex-row-reverse group">
-              <p className="px-6 py-3 rounded-l-full bg-blue-700 max-w-xs lg:max-w-md">
-                Shall we go for Hiking this weekend?
-              </p>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 20 20" className="w-full h-full fill-current">
-                  <path
-                    d="M10.001,7.8C8.786,7.8,7.8,8.785,7.8,10s0.986,2.2,2.201,2.2S12.2,11.215,12.2,10S11.216,7.8,10.001,7.8z
-   M3.001,7.8C1.786,7.8,0.8,8.785,0.8,10s0.986,2.2,2.201,2.2S5.2,11.214,5.2,10S4.216,7.8,3.001,7.8z M17.001,7.8
-  C15.786,7.8,14.8,8.785,14.8,10s0.986,2.2,2.201,2.2S19.2,11.215,19.2,10S18.216,7.8,17.001,7.8z"
-                  />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 20 20" className="w-full h-full fill-current">
-                  <path d="M19,16.685c0,0-2.225-9.732-11-9.732V2.969L1,9.542l7,6.69v-4.357C12.763,11.874,16.516,12.296,19,16.685z" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 24 24" className="w-full h-full fill-current">
-                  <path d="M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20zm0-2a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm-3.54-4.46a1 1 0 0 1 1.42-1.42 3 3 0 0 0 4.24 0 1 1 0 0 1 1.42 1.42 5 5 0 0 1-7.08 0zM9 11a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm6 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2z" />
-                </svg>
-              </button>
-            </div>
-            <div className="flex items-center flex-row-reverse group">
-              <p className="px-6 py-3 rounded-b-full rounded-l-full bg-blue-700 max-w-xs lg:max-w-md">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-                eiusmod tempor incididunt ut labore et dolore magna aliqua.
-                Volutpat lacus laoreet non curabitur gravida.
-              </p>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 20 20" className="w-full h-full fill-current">
-                  <path
-                    d="M10.001,7.8C8.786,7.8,7.8,8.785,7.8,10s0.986,2.2,2.201,2.2S12.2,11.215,12.2,10S11.216,7.8,10.001,7.8z
-   M3.001,7.8C1.786,7.8,0.8,8.785,0.8,10s0.986,2.2,2.201,2.2S5.2,11.214,5.2,10S4.216,7.8,3.001,7.8z M17.001,7.8
-  C15.786,7.8,14.8,8.785,14.8,10s0.986,2.2,2.201,2.2S19.2,11.215,19.2,10S18.216,7.8,17.001,7.8z"
-                  />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 20 20" className="w-full h-full fill-current">
-                  <path d="M19,16.685c0,0-2.225-9.732-11-9.732V2.969L1,9.542l7,6.69v-4.357C12.763,11.874,16.516,12.296,19,16.685z" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="hidden group-hover:block flex flex-shrink-0 focus:outline-none mx-2 block rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-700 bg-gray-800 w-8 h-8 p-2"
-              >
-                <svg viewBox="0 0 24 24" className="w-full h-full fill-current">
-                  <path d="M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20zm0-2a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm-3.54-4.46a1 1 0 0 1 1.42-1.42 3 3 0 0 0 4.24 0 1 1 0 0 1 1.42 1.42 5 5 0 0 1-7.08 0zM9 11a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm6 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2z" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-        
-      </div> */}
-      {currentChat.messages &&
-        currentChat.messages.length > 0 &&
-        currentChat.messages.map((message, index) => (
-          <div key={index} className="chat-body p-4 overflow-y-scroll">
-            {message.sender_username === currentUser.username ? (
-              <div className="flex flex-row justify-start">
-                <div className="w-8 h-8 relative flex flex-shrink-0 mr-4">
-                  <img
-                    className="shadow-md rounded-full w-full h-full object-cover"
-                    src={currentChat?.contact.picture}
-                    alt=""
-                  />
-                </div>
-                <div className="messages text-sm text-gray-700 grid grid-flow-row gap-2">
-                  <div className="flex items-center group">
-                    <p className="px-6 py-3 rounded-t-full rounded-r-full bg-blue-700 max-w-xs lg:max-w-md text-gray-200">
-                      {message.message}
-                    </p>
+      <div className="chat-body h-full overflow-y-scroll">
+        {currentChat.messages &&
+          currentChat.messages.length > 0 &&
+          currentChat.messages.map((message, index) => (
+            <div key={index} className="msg-container p-4">
+              {message.sender_id === currentUser.id ? (
+                <div className="flex flex-row justify-start">
+                  <div className="messages text-sm text-gray-700 grid grid-flow-row gap-2">
+                    <div className="flex items-center group">
+                      <p className="px-6 py-3 rounded-xl bg-blue-700 max-w-xs lg:max-w-xl text-gray-200 overscroll-auto">
+                        {message.message}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="flex flex-row justify-end">
-                <div className="messages text-sm text-white grid grid-flow-row gap-2">
-                  <div className="flex items-center flex-row-reverse group">
-                    <p className="px-6 py-3 rounded-t-full rounded-l-full bg-gray-800 max-w-xs lg:max-w-md">
-                      {message.message}
-                    </p>
+              ) : (
+                <div className="flex flex-row justify-end">
+                  <div className="messages text-sm text-white grid grid-flow-row gap-2">
+                    <div className="flex items-center flex-row-reverse group">
+                      <p className="px-6 py-3 rounded-xl bg-gray-800 max-w-xs lg:max-w-xl">
+                        {message.message}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          ))}
+        <div ref={chatBodyRef}></div>
+      </div>
 
       <div className="chat-footer flex-[999_999_0%] flex w-full flex-col justify-end">
         <div className="flex flex-row items-center pt-4 pb-2 px-3">

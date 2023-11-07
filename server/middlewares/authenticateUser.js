@@ -20,9 +20,8 @@ function authenticateToken(req, res, next) {
       });
     }
 
-    console.log("User : ", user);
     req.user = user;
-    console.log("Req.user : ", req.user);
+
     next();
   });
 }

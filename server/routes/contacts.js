@@ -6,6 +6,7 @@ const jwt = require("jsonwebtoken");
 const router = express.Router();
 const db = require("../database/db");
 const User = require("../models/user");
+const Conversation = require("../models/conversation");
 const authenticateToken = require("../middlewares/authenticateUser");
 
 // get all contacts from the user where id = req.user.id
@@ -69,11 +70,11 @@ router.post("/add", authenticateToken, async (req, res) => {
     }
 
     // add contact to user's contacts
-    user.contacts.push(contact._id);
+    user.contacts.push(contact.id);
     await user.save();
 
     // add user to contact's contacts
-    contact.contacts.push(user._id);
+    contact.contacts.push(user.id);
     await contact.save();
 
     return res.status(200).json({

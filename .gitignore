@@ -7,7 +7,7 @@
 /build
 
 # environment variables
-/.env
+.env
 /server/.env
 
 # IDE files

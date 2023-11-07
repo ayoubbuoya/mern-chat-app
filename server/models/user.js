@@ -23,18 +23,15 @@ const userSchema = new mongoose.Schema({
   },
   picture: {
     type: String,
+    default: "storage/images/default-profile-picture.png",
   },
   accessToken: {
     type: String,
   },
   contacts: [
     {
-      type: String || null,
-    },
-  ],
-  messages: [
-    {
-      type: String || null,
+      type : mongoose.Schema.Types.ObjectId,
+      ref: "User",
     },
   ],
   createdAt: {

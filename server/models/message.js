@@ -2,16 +2,18 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 
 const messageSchema = new mongoose.Schema({
-  sender_username: {
-    type: String,
-    required: true,
-  },
-  receiver_username: {
-    type: String,
-    required: true,
-  },
   message: {
     type: String,
+    required: true,
+  },
+  sender_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  receiver_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
     required: true,
   },
   createdAt: {
