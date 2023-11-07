@@ -6,13 +6,16 @@ import { setCurrentChat } from "../redux/features/currentChat/currentChatSlice";
 import { setOtherParticipant } from "../redux/features/otherParticipant/otherParticipantSlice";
 import Cookies from "js-cookie";
 import Contact from "../types/Contact";
+import { useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
+import { toast } from "react-toastify";
 
 const Contacts: React.FC = () => {
   const currentUser = useAppSelector((state) => state.currentUser.value);
   const contacts = useAppSelector((state) => state.contacts.value);
   const chats = useAppSelector((state) => state.chats.value);
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const BACKEND = "http://localhost:7000/";
 
   const [search, setSearch] = React.useState<string>("");
@@ -41,6 +44,9 @@ const Contacts: React.FC = () => {
 
   const handleLogOut = () => {
     console.log("Logging out...");
+    toast.loading("Logging out...", {
+      theme: "colored",
+    });
     dispatch(
       setCurrentUser({
         id: "",
@@ -51,10 +57,22 @@ const Contacts: React.FC = () => {
         createdAt: "",
       })
     );
+    dispatch(
+      setOtherParticipant({
+        id: "",
+        name: "",
+        username: "",
+        picture: "",
+      })
+    );
     dispatch(setIsSignedIn(false));
     // delete aacces token cookie
     Cookies.remove("accessToken");
     console.log("Logged out!");
+
+    setTimeout(() => {
+      navigate("/login");
+    }, 1000);
   };
 
   const handleContactClick = (contact: Contact) => {
